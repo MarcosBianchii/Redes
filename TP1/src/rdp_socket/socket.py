@@ -1,13 +1,14 @@
 from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .packet import PKT_HEADER_SIZE, Packet
 
+SYN_TIMEOUT = 1
+ACK_TIMEOUT = 1
+
 
 def _sendall(skt: socket, data: bytes, addr):
-    skt.sendto(data, addr)
-    # sent = 0
-    # while sent < len(data):
-    #     sent += skt.sendto(data[sent:], addr)
-    #     print(sent)
+    sent = 0
+    while sent < len(data):
+        sent += skt.sendto(data[sent:], addr)
 
 
 class RdpSocket:
@@ -24,7 +25,7 @@ class RdpSocket:
             _sendall(self._skt, syn_pkt.encode(), self.peer_addr())
 
             try:
-                self._skt.settimeout(10)
+                self._skt.settimeout(SYN_TIMEOUT)
                 header, peer_addr = self._skt.recvfrom(PKT_HEADER_SIZE)
             except timeout:
                 continue
@@ -45,19 +46,29 @@ class RdpSocket:
         """
         pass
 
-    def send(self, readable: bytes) -> int:
+    def send(self, data: bytes):
         """
-        Sends the `readable` data through the socket
+        Sends the `data` data through the socket
 
         Returns the amount of data sent
         """
-        pass
+        for seq_num, pkt in enumerate(Packet.make_packets(data)):
+            pkt_bytes = pkt.encode()
+            while True:
+                _sendall(self._skt, pkt_bytes, self._peer_addr)
 
-    def sendall(self, readable: bytes):
-        """
-        Makes sure to send all the content in `readable` through the socket
-        """
-        pass
+                try:
+                    self.settimeout(ACK_TIMEOUT)
+                    header = self._skt.recv(PKT_HEADER_SIZE)
+                except timeout:
+                    continue
+
+                response = Packet.from_header(header)
+                if response.is_ack_of(seq_num):
+                    break
+
+    def settimeout(self, timeout: float):
+        self._skt.settimeout(timeout)
 
     def close(self):
         """
