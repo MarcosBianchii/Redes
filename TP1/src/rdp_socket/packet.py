@@ -34,7 +34,7 @@ class InvalidHeaderSize(Exception):
 
 
 class Packet:
-    def __init__(self, pkt_size: int, ack: bool, syn: bool, seq_num: int, arr: bytes):
+    def __init__(self, pkt_size: int, ack: bool, syn: bool, seq_num: int, data: bytes):
         self._pkt_size = pkt_size
         self._ack = ack
         self._syn = syn
