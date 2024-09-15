@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Iterator
 from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .packet import PKT_HEADER_SIZE, Packet
 
@@ -17,7 +19,7 @@ class RdpSocket:
         self._peer_addr = peer_addr
 
     @classmethod
-    def connect(cls, ip: str, port: int):
+    def connect(cls, ip: str, port: int) -> RdpSocket:
         """
         Establishes a new connection to a RdpListener
         """
@@ -43,7 +45,7 @@ class RdpSocket:
     def peer_addr(self):
         return self._peer_addr
 
-    def recv(self, size: int):
+    def recv(self, size: int) -> bytes:
         """
         Blocks the main thread until `size` amounts of data arrive through the socket
         """
@@ -53,10 +55,10 @@ class RdpSocket:
         """
         Sends the bytes in `data` through the socket
         """
-        for seq_num, pkt in enumerate(Packet.make_packets(data)):
+        for pkt in Packet.make_pkts(data):
             pkt_bytes = pkt.encode()
             while True:
-                _sendall(self._skt, pkt_bytes, self._peer_addr)
+                _sendall(self._skt, pkt_bytes, self.peer_addr())
 
                 try:
                     self.settimeout(ACK_TIMEOUT)
@@ -65,7 +67,7 @@ class RdpSocket:
                     continue
 
                 response = Packet.from_header(header)
-                if response.is_ack_of(seq_num):
+                if response.is_ack_of(pkt):
                     break
 
     def settimeout(self, timeout: float):
@@ -81,16 +83,30 @@ class RdpListener:
         self._skt.bind(("127.0.0.1", port))
 
     @classmethod
-    def _create_stream(cls, peer_addr):
+    def bind(cls, port: int):
+        return cls(port)
+
+    @classmethod
+    def _create_stream(cls, peer_addr) -> RdpSocket:
         stream = RdpSocket(peer_addr)
         syn_ack = Packet.syn_ack_pkt()
         _sendall(stream._skt, syn_ack.encode(), peer_addr)
         return stream
 
+    def close(self):
+        self._skt.close()
+
     def accept(self) -> RdpSocket:
+        """
+        Blocks the main thread until a new connection arrives to this socket
+        and returns a new `RdpSocket` which links to that connection
+        """
         while True:
             try:
                 header, addr = self._skt.recvfrom(PKT_HEADER_SIZE)
+            except KeyboardInterrupt:
+                self.close()
+                raise
             except:
                 continue
 
@@ -98,6 +114,9 @@ class RdpListener:
             if pkt.is_syn() and not pkt.is_ack():
                 return self._create_stream(addr)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[RdpSocket]:
+        """
+        Returns an iterator over incoming connections
+        """
         while True:
             yield self.accept()

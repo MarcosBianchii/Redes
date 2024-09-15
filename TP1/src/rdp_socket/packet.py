@@ -8,7 +8,6 @@ PKT_DATA_SIZE = MAX_PKT_SIZE - PKT_HEADER_SIZE
 ACK_MASK = 1 << 15
 SYN_MASK = 1 << 14
 
-
 """
                             RDP HEADER
 
@@ -29,13 +28,41 @@ SYN_MASK = 1 << 14
 
 
 class InvalidHeaderSize(Exception):
-    def __str__(self):
+    def __str__(self) -> str:
         return f"The size of the header is not {PKT_HEADER_SIZE}"
 
 
+class PacketBuilder:
+    def __init__(self):
+        self._ack = False
+        self._syn = False
+        self._seq_num = 0
+        self._data = bytes()
+
+    def ack(self, value: bool) -> PacketBuilder:
+        self._ack = value
+        return self
+
+    def syn(self, value: bool) -> PacketBuilder:
+        self._syn = value
+        return self
+
+    def seq_num(self, value: int) -> PacketBuilder:
+        self._seq_num = value
+        return self
+
+    def data(self, value: bytes) -> PacketBuilder:
+        self._data = value
+        return self
+
+    def build(self) -> Packet:
+        size = PKT_HEADER_SIZE + len(self._data)
+        return Packet(size, self._ack, self._syn, self._seq_num, self._data)
+
+
 class Packet:
-    def __init__(self, pkt_size: int, ack: bool, syn: bool, seq_num: int, data: bytes):
-        self._pkt_size = pkt_size
+    def __init__(self, size: int, ack: bool, syn: bool, seq_num: int, data: bytes):
+        self._size = size
         self._ack = ack
         self._syn = syn
         self._seq_num = seq_num
@@ -57,18 +84,21 @@ class Packet:
         return cls(size, ack, syn, seq_num, bytes())
 
     @classmethod
+    def builder(cls) -> PacketBuilder:
+        return PacketBuilder()
+
+    @classmethod
     def syn_pkt(cls) -> Packet:
-        """
-        Creates a syn packet
-        """
-        return Packet(PKT_HEADER_SIZE, False, True, 0, bytes())
+        return cls.builder() \
+            .syn(True)       \
+            .build()
 
     @classmethod
     def syn_ack_pkt(cls) -> Packet:
-        """
-        Returns True if packet has syn and ack fields enabled
-        """
-        return cls(PKT_HEADER_SIZE, True, True, 0, bytes())
+        return cls.builder() \
+            .ack(True)       \
+            .syn(True)       \
+            .build()
 
     def is_syn(self) -> bool:
         return self._syn
@@ -76,31 +106,33 @@ class Packet:
     def is_ack(self) -> bool:
         return self._ack
 
-    def is_ack_of(self, num) -> bool:
-        return self._ack and self._seq_num == num
+    def is_ack_of(self, pkt: Packet) -> bool:
+        return self.is_ack() and self._seq_num == pkt._seq_num
 
     @classmethod
-    def _pkt_size_chunks(cls, data: bytes) -> Iterator[bytes]:
+    def _pkt_data_size_chunks(cls, data: bytes) -> Iterator[bytes]:
         for i in range(0, len(data), PKT_DATA_SIZE):
             bot = i
             top = min(i + PKT_DATA_SIZE, len(data))
             yield data[bot:top]
 
     @classmethod
-    def make_packets(cls, data: bytes) -> Iterator[Packet]:
-        for seq_num, pkt_data in enumerate(cls._pkt_size_chunks(data)):
-            size = PKT_HEADER_SIZE + len(pkt_data)
-            yield cls(size, False, False, seq_num, pkt_data)
+    def make_pkts(cls, data: bytes) -> Iterator[Packet]:
+        for seq_num, pkt_data in enumerate(cls._pkt_data_size_chunks(data)):
+            yield cls.builder()   \
+                .seq_num(seq_num) \
+                .data(pkt_data)   \
+                .build()
 
     def encode(self) -> bytes:
         """
         Turns the packet into bytes
         """
-        pkt_size = self._pkt_size.to_bytes(2, "big")
+        size = self._size.to_bytes(2, "big")
         flags = (ACK_MASK * self._ack) | (SYN_MASK * self._syn)
         flags = int.to_bytes(flags, 2, "big")
         seq_num = self._seq_num.to_bytes(4, "big")
-        return pkt_size + flags + seq_num + self._data
+        return size + flags + seq_num + self._data
 
-    def __str__(self):
-        return f"pkt_size: {self._pkt_size}, ack: {self._ack}, syn: {self._syn}, seq_num: {self._seq_num}"
+    def __str__(self) -> str:
+        return f"size: {self._size}, ack: {self._ack}, syn: {self._syn}, seq_num: {self._seq_num}"
