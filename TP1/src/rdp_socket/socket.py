@@ -18,6 +18,9 @@ class RdpSocket:
 
     @classmethod
     def connect(cls, ip: str, port: int):
+        """
+        Establishes a new connection to a RdpListener
+        """
         self = cls((ip, port))
 
         while True:
@@ -48,9 +51,7 @@ class RdpSocket:
 
     def send(self, data: bytes):
         """
-        Sends the `data` data through the socket
-
-        Returns the amount of data sent
+        Sends the bytes in `data` through the socket
         """
         for seq_num, pkt in enumerate(Packet.make_packets(data)):
             pkt_bytes = pkt.encode()
@@ -71,9 +72,6 @@ class RdpSocket:
         self._skt.settimeout(timeout)
 
     def close(self):
-        """
-        Closes the connection
-        """
         self._skt.close()
 
 
