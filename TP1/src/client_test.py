@@ -2,7 +2,7 @@ from rdp_socket.socket import RdpSocket
 from sys import argv
 
 if len(argv) < 2:
-    print("No me diste el puerto")
+    print(f"Use: python3 {argv[0]} <port>")
     exit(1)
 
 puerto = int(argv[1])

@@ -5,7 +5,7 @@ from .packet import PKT_HEADER_SIZE, Packet
 
 ACK_TIMEOUT = 0.1
 SYN_ACK_TIMEOUT = 0.1
-SYN_ACK_DUP_TIMEOUT = 2 * SYN_ACK_TIMEOUT
+SYN_ACK_DUP_TIMEOUT = ACK_TIMEOUT + SYN_ACK_TIMEOUT
 
 
 def _sendall(skt: socket, data: bytes, addr):
@@ -28,11 +28,11 @@ class RdpSocket:
 
         # Send SYN
         syn_pkt = Packet.syn_pkt()
-        syn_pkt_bytes = syn_pkt.encode()
+        syn_bytes = syn_pkt.encode()
         self._skt.settimeout(SYN_ACK_TIMEOUT)
 
         while True:
-            _sendall(self._skt, syn_pkt_bytes, self.peer_addr())
+            _sendall(self._skt, syn_bytes, self.peer_addr())
             try:
                 # Receive SYN + ACK
                 header, peer_addr = self._skt.recvfrom(PKT_HEADER_SIZE)
@@ -43,10 +43,10 @@ class RdpSocket:
             except timeout:
                 continue
 
-        # Send SYN + ACK
+        # Send ACK
         ack_pkt = Packet.ack_pkt()
         ack_bytes = ack_pkt.encode()
-        self._skt.settimeout(ACK_TIMEOUT)
+        self._skt.settimeout(SYN_ACK_DUP_TIMEOUT)
 
         while True:
             _sendall(self._skt, ack_bytes, self.peer_addr())
@@ -60,8 +60,8 @@ class RdpSocket:
             if not pkt.is_syn() or not pkt.is_ack():
                 raise Exception(f"Received ({pkt}) unexpectedly")
 
-            # Received a duplicated SYN + ACK packet, which means
-            # our last SYN + ACK never reached the other end
+            # Received a duplicated SYN + ACK packet, which
+            # means our last ACK never reached the other end
 
         return self
 
@@ -126,18 +126,18 @@ class RdpListener:
         stream = RdpSocket(peer_addr)
         syn_ack = Packet.syn_ack_pkt()
         syn_ack_bytes = syn_ack.encode()
-        stream.settimeout(SYN_ACK_TIMEOUT)
+        stream.settimeout(ACK_TIMEOUT)
 
         while True:
             _sendall(stream._skt, syn_ack_bytes, stream.peer_addr())
             try:
-                # Receive SYN + ACK
+                # Receive ACK
                 header = stream._skt.recv(PKT_HEADER_SIZE)
             except timeout:
                 continue
 
             pkt = Packet.from_header(header)
-            if not pkt.is_syn() and pkt.is_ack():
+            if pkt.is_ack():
                 break
 
         return stream
