@@ -12,7 +12,6 @@ print(f"Escuchando en el puerto: {puerto}")
 
 
 def close_listener(sig, frame):
-    print("Cerre el listener socket")
     listener.close()
     exit(0)
 
@@ -22,4 +21,6 @@ signal.signal(signal.SIGINT, close_listener)
 
 for stream in listener:
     print(f"Me llego una coneccion de: {stream.peer_addr()}")
+    data = stream.recv()
+    print(data.decode())
     stream.close()
