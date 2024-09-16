@@ -92,6 +92,13 @@ class Packet:
         return cls.builder() \
             .syn(True)       \
             .build()
+    
+    
+    @classmethod
+    def ack_pkt(cls) -> Packet:
+        return cls.builder() \
+            .ack(True)       \
+            .build()
 
     @classmethod
     def syn_ack_pkt(cls) -> Packet:

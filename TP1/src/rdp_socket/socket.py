@@ -44,12 +44,12 @@ class RdpSocket:
                 continue
 
         # Send SYN + ACK
-        syn_ack_pkt = Packet.syn_ack_pkt()
-        syn_ack_bytes = syn_ack_pkt.encode()
-        self._skt.settimeout(SYN_ACK_DUP_TIMEOUT)
+        ack_pkt = Packet.ack_pkt()
+        ack_bytes = ack_pkt.encode()
+        self._skt.settimeout(ACK_TIMEOUT)
 
         while True:
-            _sendall(self._skt, syn_ack_bytes, self.peer_addr())
+            _sendall(self._skt, ack_bytes, self.peer_addr())
             try:
                 # Don't receive anything for SYN_ACK_DUP_TIMEOUT
                 header = self._skt.recv(PKT_HEADER_SIZE)
@@ -137,7 +137,7 @@ class RdpListener:
                 continue
 
             pkt = Packet.from_header(header)
-            if pkt.is_syn() and pkt.is_ack():
+            if not pkt.is_syn() and pkt.is_ack():
                 break
 
         return stream
