@@ -7,7 +7,7 @@ TIMEOUT = 0.2
 
 
 class RdpSocket:
-    def __init__(self, peer_addr):
+    def __init__(self, peer_addr: tuple[str, int]):
         self._skt = socket(AF_INET, SOCK_DGRAM)
         self._peer_addr = peer_addr
 
@@ -60,8 +60,8 @@ class RdpSocket:
         """
         Blocks the main thread until a new message arrives through the socket
         """
-        data = bytes()
         self.settimeout(None)
+        data = bytes()
         ack_num = -1
 
         while True:
@@ -119,7 +119,7 @@ class RdpSocket:
                 if response.is_ack_of(pkt):
                     break
 
-    def peer_addr(self):
+    def peer_addr(self) -> tuple[str, int]:
         return self._peer_addr
 
     def settimeout(self, timeout: float):
@@ -130,14 +130,17 @@ class RdpSocket:
 
 
 class RdpListener:
-    def __init__(self, port: int):
+    def __init__(self, addr: tuple[str, int]):
         self._skt = socket(AF_INET, SOCK_DGRAM)
-        self._skt.bind(("127.0.0.1", port))
+        self._skt.bind(addr)
         self._conns = set()
 
     @classmethod
-    def bind(cls, port: int):
-        return cls(port)
+    def bind(cls, ip: str, port: int) -> RdpListener:
+        """
+        Creates a new RdpListener and binds it to the given address
+        """
+        return cls((ip, port))
 
     def accept(self) -> RdpSocket:
         """

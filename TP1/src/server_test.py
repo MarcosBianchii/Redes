@@ -7,7 +7,7 @@ if len(argv) < 2:
     exit(1)
 
 puerto = int(argv[1])
-listener = RdpListener.bind(puerto)
+listener = RdpListener.bind("127.0.0.1", puerto)
 print(f"Escuchando en el puerto: {puerto}")
 
 
