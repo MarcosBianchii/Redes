@@ -58,7 +58,7 @@ class RdpSocket:
 
     def recv(self) -> bytes:
         """
-        Blocks the main thread until encountering a packet that's not MAX_PACKET_SIZE
+        Blocks the main thread until a new message arrives through the socket
         """
         data = bytes()
         self.settimeout(None)
