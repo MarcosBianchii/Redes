@@ -21,6 +21,9 @@ signal.signal(signal.SIGINT, close_listener)
 
 for stream in listener:
     print(f"Me llego una coneccion de: {stream.peer_addr()}")
-    data = stream.recv()
-    print(data.decode())
+
+    with open("rdp_socket/socket.py") as f:
+        data = f.read()
+
+    stream.send(data.encode())
     stream.close()

@@ -2,13 +2,13 @@ from __future__ import annotations
 from typing import Iterator
 
 UDP_HEADER_SIZE = 8
-RDP_HEADER_SIZE = 8
-MAX_PKT_SIZE = 16  # 2 ** 16 - UDP_HEADER_SIZE
+RDP_HEADER_SIZE = 4
+MAX_PKT_SIZE = 2 ** 16 - UDP_HEADER_SIZE
 RDP_DATA_SIZE = MAX_PKT_SIZE - RDP_HEADER_SIZE
 
-ACK_MASK = 1 << 15
-SYN_MASK = 1 << 14
-LST_MASK = 1 << 13
+ACK_MASK = 1 << 7
+SYN_MASK = 1 << 6
+LST_MASK = 1 << 5
 
 """
                             RDP HEADER
@@ -16,23 +16,15 @@ LST_MASK = 1 << 13
                      1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                               |A|S|L|                         |
-|         RESERVED              |C|Y|S|       RESERVED          |
-|                               |K|N|T|                         |
-+-------------------------------+-+-+-+-------------------------+
-|                            SEQ NUM                            |
-+---------------------------------------------------------------+
+|A|S|L|         |                                               |
+|C|Y|S|  FLAGS  |                    SEQ NUM                    |
+|K|N|T|         |                                               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                                                               |
-.                              DATA                             .
+.                             DATA                              .
 .                                                               .
 
 """
-
-
-class InvalidHeaderSize(Exception):
-    def __str__(self) -> str:
-        return f"The size of the header is not {RDP_HEADER_SIZE}"
-
 
 class PacketBuilder:
     def __init__(self):
@@ -76,11 +68,11 @@ class Packet:
 
     @classmethod
     def from_bytes(cls, pkt_bytes: bytes) -> Packet:
-        flags = int.from_bytes(pkt_bytes[2:4], "big")
+        flags = pkt_bytes[0]
         ack = flags & ACK_MASK != 0
         syn = flags & SYN_MASK != 0
         lst = flags & LST_MASK != 0
-        seq_num = int.from_bytes(pkt_bytes[4:8], "big")
+        seq_num = int.from_bytes(pkt_bytes[1:4], "big")
         data = pkt_bytes[RDP_HEADER_SIZE:]
         return cls.builder()  \
             .ack(ack)         \
@@ -133,7 +125,7 @@ class Packet:
         return self._data
 
     @classmethod
-    def _RDP_DATA_SIZE_chunks(cls, data: bytes) -> Iterator[bytes]:
+    def _pkt_data_size_chunks(cls, data: bytes) -> Iterator[bytes]:
         for i in range(0, len(data), RDP_DATA_SIZE):
             bot = i
             top = min(i + RDP_DATA_SIZE, len(data))
@@ -142,7 +134,7 @@ class Packet:
     @classmethod
     def make_pkts(cls, data: bytes) -> Iterator[Packet]:
         lst_pos = (len(data) - 1) // RDP_DATA_SIZE
-        for seq_num, data in enumerate(cls._RDP_DATA_SIZE_chunks(data)):
+        for seq_num, data in enumerate(cls._pkt_data_size_chunks(data)):
             yield cls.builder()          \
                 .lst(seq_num == lst_pos) \
                 .seq_num(seq_num)        \
@@ -156,9 +148,9 @@ class Packet:
         ack = ACK_MASK * self.is_ack()
         syn = SYN_MASK * self.is_syn()
         lst = LST_MASK * self.is_lst()
-        flags = int.to_bytes(ack | syn | lst, 2, "big")
-        seq_num = self._seq_num.to_bytes(4, "big")
-        return int.to_bytes(0, 2, "big") + flags + seq_num + self.data()
+        flags = int.to_bytes(ack | syn | lst, 1, "big")
+        seq_num = self.seq_num().to_bytes(3, "big")
+        return flags + seq_num + self.data()
 
     def __str__(self) -> str:
         return f"ack: {self._ack}, syn: {self._syn}, lst: {self._lst}, seq_num: {self._seq_num}"

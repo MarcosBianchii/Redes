@@ -10,8 +10,6 @@ socket = RdpSocket.connect("127.0.0.1", puerto)
 print(f"Me conecte a: {socket.peer_addr()}")
 
 
-with open("rdp_socket/socket.py") as f:
-    data = f.read()
-
-socket.send(data.encode())
+data = socket.recv()
+print(data.decode())
 socket.close()

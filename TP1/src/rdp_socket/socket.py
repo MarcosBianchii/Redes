@@ -93,13 +93,11 @@ class RdpSocket:
 
         return data
 
-    def send(self, data: bytes) -> int:
+    def send(self, data: bytes):
         """
-        Sends the bytes in `data` through the socket. Returns the
-        amount of packets necessary to send all the data
+        Sends the bytes in `data` through the socket
         """
         self.settimeout(TIMEOUT)
-        pkt_amount = 0
 
         for pkt in Packet.make_pkts(data):
             pkt_bytes = pkt.encode()
@@ -114,15 +112,12 @@ class RdpSocket:
                 if response.is_syn() and response.is_ack():
                     # Our handshake ACK didn't reach
                     # the other side, resend and retry
-                    ack_pkt = Packet.ack_pkt()
+                    ack_pkt = Packet.ack_pkt(0)
                     self._sendall(ack_pkt.encode())
-                    return pkt_amount + self.send(data)
+                    return self.send(data)
 
                 if response.is_ack_of(pkt):
-                    pkt_amount += 1
                     break
-
-        return pkt_amount
 
     def peer_addr(self):
         return self._peer_addr
