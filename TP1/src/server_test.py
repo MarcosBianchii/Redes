@@ -1,14 +1,14 @@
 import signal
 from sys import argv
-from rdp_socket.socket import RdpListener
+from rdp.socket import RdpListener
 
-if len(argv) < 2:
-    print(f"Use: python3 {argv[0]} <port>")
+if len(argv) < 2 or ":" not in argv[1]:
+    print(f"Use: python3 {argv[0]} <ip:port>")
     exit(1)
 
-puerto = int(argv[1])
-listener = RdpListener.bind("127.0.0.1", puerto)
-print(f"Escuchando en el puerto: {puerto}")
+ip, port = argv[1].split(":")
+listener = RdpListener.bind(ip, int(port))
+print(f"Listening on port: {port}")
 
 
 def close_listener(sig, frame):
@@ -20,10 +20,14 @@ signal.signal(signal.SIGINT, close_listener)
 
 
 for stream in listener:
-    print(f"Me llego una coneccion de: {stream.peer_addr()}")
+    print(f"New connection arrived from: {stream.peer_addr()}")
 
-    with open("rdp_socket/socket.py") as f:
-        data = f.read()
+    data = stream.recv()
+    print(f"Recibi: {data.decode()}")
 
-    stream.send(data.encode())
+    stream.send("Mensaje de servidor a cliente".encode())
+
+    data = stream.recv()
+    print(f"Recibi: {data.decode()}")
+
     stream.close()
