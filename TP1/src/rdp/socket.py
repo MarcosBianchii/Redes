@@ -75,7 +75,7 @@ class RdpStream:
         while True:
             seg_bytes = self._recv_from_peer()
             seg = Segment.from_bytes(seg_bytes)
-            print(f"[RECV] SEG({seg.seq_num()})")
+            print(f"[RECV] SEG({seg.seq_num()}), expected: {self._ack_ofs}")
             if seg.is_syn() and seg.is_ack():
                 # Our handshake ACK didn't reach
                 # the other side, resend and retry
@@ -83,14 +83,13 @@ class RdpStream:
                 self._sendall(ack_seg.encode())
                 continue
 
-            # Lost packet
+            # Lost segment
             if seg.is_syn() or seg.is_ack():
                 continue
 
-            # Only ACK packets that are less
+            # Only ACK segments that are less
             # than or equal to the ACK offset
             if seg.seq_num() <= self._ack_ofs:
-                # Respond with an ACK of this seg
                 ack_seg = Segment.ack_seg(seg.seq_num())
                 print(f"[SEND] ACK({ack_seg.seq_num()})")
                 self._sendall(ack_seg.encode())
@@ -134,13 +133,13 @@ class RdpStream:
                     self._sendall(ack_seg.encode())
                     return self.send(data)
 
-                if res.is_ack() and res.seq_num() < self._ack_ofs:
+                if res.is_ack() and res.seq_num() < self._seq_ofs:
                     # The last ACK of the previous call to recv
                     # didn't reach the other end, send ACK
                     ack_seg = Segment.ack_seg(res.seq_num())
                     self._sendall(ack_seg.encode())
 
-                if res.is_ack() and res.seq_num() == self._ack_ofs:
+                if res.is_ack() and res.seq_num() == self._seq_ofs:
                     print(f"[RECV] ACK({seg.seq_num()})")
                     self._advance_seq_ofs(1)
                     retries = 0
@@ -175,7 +174,7 @@ class RdpListener:
         and returns a new `RdpStream` which links to that connection
         """
         while True:
-            # Wait for SYN packets for new connections
+            # Wait for SYN segments for new connections
             seg_bytes, peer_addr = self._skt.recvfrom(RDP_HEADER_SIZE)
             seg = Segment.from_bytes(seg_bytes)
             if seg.is_syn() and peer_addr not in self._conns:
@@ -197,7 +196,7 @@ class RdpListener:
                 continue
 
             seg = Segment.from_bytes(seg_bytes)
-            if seg.is_ack_of(syn_ack):
+            if seg.is_ack() and seg.seq_num() == 0:
                 break
 
         return stream

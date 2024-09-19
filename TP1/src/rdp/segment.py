@@ -3,7 +3,7 @@ from typing import Iterator
 
 UDP_HEADER_SIZE = 8
 RDP_HEADER_SIZE = 4
-MAX_SEG_SIZE = 2 ** 16 - UDP_HEADER_SIZE
+MAX_SEG_SIZE = 8  # 2 ** 16 - UDP_HEADER_SIZE
 RDP_DATA_SIZE = MAX_SEG_SIZE - RDP_HEADER_SIZE
 MAX_SEQ_NUM = 2 ** 24
 
@@ -116,9 +116,6 @@ class Segment:
 
     def is_lst(self) -> bool:
         return self._lst
-
-    def is_ack_of(self, seg: Segment) -> bool:
-        return self.is_ack() and self._seq_num == seg._seq_num
 
     def seq_num(self) -> int:
         return self._seq_num
