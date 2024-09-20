@@ -12,12 +12,11 @@ class RdpStream:
         self._skt = socket(AF_INET, SOCK_DGRAM)
         self._peer_addr = peer_addr
         self._seq_ofs = 0
-        self._ack_ofs = 0
 
     @classmethod
     def connect(cls, ip: str, port: int) -> RdpStream:
         """
-        Establishes a new connection to a RdpListener
+        Establishes a new connection to a RdpListener.
         """
         self = cls((ip, port))
         syn_seg = Segment.syn_seg()
@@ -27,7 +26,7 @@ class RdpStream:
         while True:
             self._sendall(syn_bytes)
             try:
-                # Wait for SYNACK from the new connection
+                # Wait for SYNACK from the new connection.
                 seg_bytes, peer_addr = self._skt.recvfrom(RDP_HEADER_SIZE)
             except timeout:
                 continue
@@ -37,14 +36,13 @@ class RdpStream:
                 self._peer_addr = peer_addr
                 break
 
-        # Send ACK
         ack_seg = Segment.ack_seg(0)
         self._sendall(ack_seg.encode())
         return self
 
     def _sendall(self, data: bytes):
         """
-        Sends all the contents in `data` through the socket
+        Sends all the contents in `data` through the socket.
         """
         sent = 0
         while sent < len(data):
@@ -52,52 +50,54 @@ class RdpStream:
 
     def _recv_from_peer(self) -> bytes:
         """
-        Read the socket for the next message from our peer connection
+        Read the socket for the next message from our peer connection.
         """
         while True:
             seg, addr = self._skt.recvfrom(MAX_SEG_SIZE)
             if self.peer_addr() == addr:
                 return seg
 
+    def _recv_seg(self) -> Segment:
+        """
+        Blocks the main thread until a new segment arrives through the socket. If
+        a SYNACK segment arrives will try and finish establishing the connection
+        with the other end.
+        """
+        seg_bytes = self._recv_from_peer()
+        seg = Segment.from_bytes(seg_bytes)
+        if seg.is_syn() and seg.is_ack():
+            # Our handshake ACK didn't reach
+            # the other side, resend and retry.
+            ack_seg = Segment.ack_seg(0)
+            self._sendall(ack_seg.encode())
+            return self._recv_seg()
+
+        return seg
+
     def _advance_seq_ofs(self, quantity: int):
         self._seq_ofs = (self._seq_ofs + quantity) % MAX_SEQ_NUM
 
-    def _advance_ack_ofs(self, quantity: int):
-        self._ack_ofs = (self._ack_ofs + quantity) % MAX_SEQ_NUM
-
     def recv(self) -> bytes:
         """
-        Blocks the main thread until a new message arrives through the socket
+        Blocks the main thread until a new segment arrives through the socket.
         """
         self.settimeout(None)
         data = bytes()
 
         while True:
-            seg_bytes = self._recv_from_peer()
-            seg = Segment.from_bytes(seg_bytes)
-            print(f"[RECV] SEG({seg.seq_num()}), expected: {self._ack_ofs}")
-            if seg.is_syn() and seg.is_ack():
-                # Our handshake ACK didn't reach
-                # the other side, resend and retry
-                ack_seg = Segment.ack_seg(0)
-                self._sendall(ack_seg.encode())
-                continue
+            seg = self._recv_seg()
+            if seg.is_ack():
+                print(f"[RECV:0] ACK({seg.seq_num()})")
+            else:
+                print(f"[RECV:1] SEG({seg.seq_num()})")
 
-            # Lost segment
-            if seg.is_syn() or seg.is_ack():
-                continue
-
-            # Only ACK segments that are less
-            # than or equal to the ACK offset
-            if seg.seq_num() <= self._ack_ofs:
+            if not seg.is_ack() and seg.seq_num() <= self._seq_ofs:
                 ack_seg = Segment.ack_seg(seg.seq_num())
-                print(f"[SEND] ACK({ack_seg.seq_num()})")
                 self._sendall(ack_seg.encode())
+                print(f"[SEND:0] ACK({ack_seg.seq_num()})")
 
-                if seg.seq_num() == self._ack_ofs:
-                    self._advance_ack_ofs(1)
-
-                    # Take the seg data
+                if seg.seq_num() == self._seq_ofs:
+                    self._advance_seq_ofs(1)
                     data += seg.unwrap()
                     if seg.is_lst():
                         break
@@ -106,44 +106,45 @@ class RdpStream:
 
     def send(self, data: bytes):
         """
-        Sends the bytes in `data` through the socket
+        Sends the bytes in `data` through the socket.
         """
         self.settimeout(TIMEOUT)
         retries = 0
 
         for seg in Segment.make_segments(data, self._seq_ofs):
             seg_bytes = seg.encode()
-            while True:
-                if seg.is_lst() and retries == MAX_RETRY_COUNT:
-                    break
-
-                print(f"[SEND] SEG({seg.seq_num()})")
+            while retries < MAX_RETRY_COUNT:
                 self._sendall(seg_bytes)
+                print(f"[SEND:1] SEG({seg.seq_num()})")
                 try:
-                    seg_bytes = self._recv_from_peer()
+                    res = self._recv_seg()
                 except timeout:
                     retries += 1
                     continue
 
-                res = Segment.from_bytes(seg_bytes)
-                if res.is_syn() and res.is_ack():
-                    # Our handshake ACK didn't reach
-                    # the other end, resend and retry
-                    ack_seg = Segment.ack_seg(0)
-                    self._sendall(ack_seg.encode())
-                    return self.send(data)
+                if res.is_ack():
+                    print(f"[RECV:2] ACK({res.seq_num()})")
+                else:
+                    print(f"[RECV:3] SEG({res.seq_num()})")
 
-                if res.is_ack() and res.seq_num() < self._seq_ofs:
-                    # The last ACK of the previous call to recv
-                    # didn't reach the other end, send ACK
-                    ack_seg = Segment.ack_seg(res.seq_num())
-                    self._sendall(ack_seg.encode())
-
-                if res.is_ack() and res.seq_num() == self._seq_ofs:
-                    print(f"[RECV] ACK({seg.seq_num()})")
+                if res.is_ack() and res.seq_num() == seg.seq_num():
                     self._advance_seq_ofs(1)
                     retries = 0
                     break
+
+                if not res.is_ack():
+                    if res.seq_num() < self._seq_ofs:
+                        # The other side is still sending a data
+                        # segment from a a previous call to recv.
+                        ack_seg = Segment.ack_seg(res.seq_num())
+                        self._sendall(ack_seg.encode())
+                        print(f"[SEND:2] ACK({ack_seg.seq_num()})")
+                    else:
+                        # We didn't receive their last ACK
+                        # and are still trying to send the
+                        # last segment.
+                        self._advance_seq_ofs(1)
+                        return
 
     def peer_addr(self) -> tuple[str, int]:
         return self._peer_addr
@@ -164,14 +165,14 @@ class RdpListener:
     @classmethod
     def bind(cls, ip: str, port: int) -> RdpListener:
         """
-        Creates a new RdpListener and binds it to the given address
+        Creates a new RdpListener and binds it to the given address.
         """
         return cls((ip, port))
 
     def accept(self) -> RdpStream:
         """
         Blocks the main thread until a new connection arrives to this socket
-        and returns a new `RdpStream` which links to that connection
+        and returns a new `RdpStream` which links to that connection.
         """
         while True:
             # Wait for SYN segments for new connections
@@ -203,7 +204,7 @@ class RdpListener:
 
     def __iter__(self) -> Iterator[RdpStream]:
         """
-        Returns an iterator over incoming connections
+        Returns an iterator over incoming connections.
         """
         while True:
             yield self.accept()

@@ -14,10 +14,13 @@ print(f"Connected to: {stream.peer_addr()}")
 #     stream.send(data.encode())
 
 stream.send("Primer mensaje enviado".encode())
+print()
 
 data = stream.recv()
 print(f"Recibi: {data.decode()}")
+print()
 
 stream.send("Segundo mensaje, es mas largo".encode())
+print()
 
 stream.close()

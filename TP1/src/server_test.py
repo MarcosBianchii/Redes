@@ -24,10 +24,13 @@ for stream in listener:
 
     data = stream.recv()
     print(f"Recibi: {data.decode()}")
+    print()
 
     stream.send("Mensaje de servidor a cliente".encode())
+    print()
 
     data = stream.recv()
     print(f"Recibi: {data.decode()}")
+    print()
 
     stream.close()

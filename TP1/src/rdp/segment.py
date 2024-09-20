@@ -3,7 +3,7 @@ from typing import Iterator
 
 UDP_HEADER_SIZE = 8
 RDP_HEADER_SIZE = 4
-MAX_SEG_SIZE = 8  # 2 ** 16 - UDP_HEADER_SIZE
+MAX_SEG_SIZE = 2 ** 16 - UDP_HEADER_SIZE
 RDP_DATA_SIZE = MAX_SEG_SIZE - RDP_HEADER_SIZE
 MAX_SEQ_NUM = 2 ** 24
 
@@ -152,4 +152,4 @@ class Segment:
         return flags + seq_num + self.unwrap()
 
     def __str__(self) -> str:
-        return f"ack: {self._ack}, syn: {self._syn}, lst: {self._lst}, seq_num: {self._seq_num}"
+        return f"ack: {self._ack}, syn: {self._syn}, lst: {self._lst}, seq_num: {self._seq_num}, dsize: {len(self._data)}"

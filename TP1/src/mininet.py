@@ -1,6 +1,14 @@
 from mininet.topo import Topo
 from mininet.link import TCLink
 
+"""
+              Net Topology
+
+            40%           20%
+    [h1] --------- [X] --------- [h2]
+
+"""
+
 
 class PacketLoss(Topo):
     def __init__(self):
@@ -12,8 +20,8 @@ class PacketLoss(Topo):
         s1 = self.addSwitch('s1')
 
         # Add links
-        self.addLink(h2, s1, cls=TCLink, loss=0)
-        self.addLink(h1, s1, cls=TCLink, loss=20)
+        self.addLink(h2, s1, cls=TCLink, loss=40)
+        self.addLink(h1, s1, cls=TCLink, loss=10)
 
 
 topos = {'packet-loss': (lambda: PacketLoss())}
