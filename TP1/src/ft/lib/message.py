@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 from enum import Enum
 
 """
@@ -22,7 +21,7 @@ class Method(Enum):
     OK = 3
 
     @classmethod
-    def from_str(cls, s: str) -> Optional[Method]:
+    def from_str(cls, s: str) -> Method:
         match s:
             case "UP":
                 return cls.UPLOAD
@@ -32,6 +31,8 @@ class Method(Enum):
                 return cls.OK
             case "ERR":
                 return cls.ERROR
+            case _:
+                raise ValueError("Invalid method field")
 
     def __str__(self) -> str:
         match self:
@@ -43,10 +44,6 @@ class Method(Enum):
                 return "ERR"
             case Method.OK:
                 return "OK"
-
-
-class InvalidMethodField(Exception):
-    pass
 
 
 class MessageBuilder:

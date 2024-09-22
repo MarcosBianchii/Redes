@@ -164,10 +164,10 @@ class RdpListener:
         self._conns = set()
         self._addr = addr
 
-    @ classmethod
+    @classmethod
     def bind(cls, ip: str, port: int, log: bool = False) -> RdpListener:
         """
-        Creates a new RdpListener and binds it to the given address.
+        Creates a new `RdpListener` and binds it to the given address.
         """
         return cls((ip, port), log)
 
@@ -189,7 +189,7 @@ class RdpListener:
                 break
 
         # Send SYNACK to peer from a new socket
-        stream = RdpStream(peer_addr, self._log)
+        stream = RdpStream(peer_addr, isinstance(self._log, VerboseLogger))
         syn_ack_seg = Segment.syn_ack_seg()
         stream.settimeout(TIMEOUT)
 

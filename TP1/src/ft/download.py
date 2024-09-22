@@ -12,13 +12,18 @@ if __name__ == "__main__":
     ip, port = config.addr()
     stream = RdpStream.connect(ip, port, log=log)
 
-    msg = Message.download(config.name())
+    name = config.name()
+    msg = Message.download(name)
     stream.send(msg.encode())
     res = stream.recv()
     stream.close()
 
-    dst = config.dst()
     msg = Message.from_bytes(res)
+    if msg.is_error():
+        print(msg.unwrap().decode())
+        exit(1)
+
+    dst = config.dst()
     os.makedirs(dst, exist_ok=True)
-    with open(dst + msg.path(), "wb") as f:
+    with open(dst + "/" + name, "wb") as f:
         f.write(msg.unwrap())
