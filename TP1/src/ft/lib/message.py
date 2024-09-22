@@ -3,10 +3,15 @@ from typing import Optional
 from enum import Enum
 
 """
-        UPLOAD                      DOWNLOAD
+                       UPLOAD                        DOWNLOAD
 
-   UP /file_name\ndata           DOWN /file_name
+                 UP /file_name\ndata             DOWN /file_name
 
+
+
+                         OK                           ERROR
+    
+                 OK /file_name\ndata           ERR /file_name\ndata
 """
 
 
