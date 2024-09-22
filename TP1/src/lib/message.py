@@ -9,7 +9,7 @@ from enum import Enum
 
 
                          OK                           ERROR
-    
+
                  OK /file_name\ndata           ERR /file_name\ndata
 """
 

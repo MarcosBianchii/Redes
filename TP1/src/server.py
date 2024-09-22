@@ -1,4 +1,4 @@
-from rdp.socket import RdpListener, RdpStream
+from lib.rdp.socket import RdpListener, RdpStream
 from lib.config import ServerConfig
 from lib.message import Message
 from threading import Thread

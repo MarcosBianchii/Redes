@@ -1,5 +1,5 @@
 from lib.config import DownloadConfig
-from rdp.socket import RdpStream
+from lib.rdp.socket import RdpStream
 from lib.message import Message
 from sys import argv
 import os

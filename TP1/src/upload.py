@@ -1,5 +1,5 @@
+from lib.rdp.socket import RdpStream
 from lib.config import UploadConfig
-from rdp.socket import RdpStream
 from lib.message import Message
 from sys import argv
 

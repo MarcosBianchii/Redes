@@ -1,4 +1,4 @@
-from rdp.socket import RdpStream
+from lib.rdp.socket import RdpStream
 from sys import argv
 
 if len(argv) < 2 or ":" not in argv[1]:

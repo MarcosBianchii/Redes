@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Iterator, Optional
-from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .segment import Segment, MAX_SEG_SIZE, RDP_HEADER_SIZE, MAX_SEQ_NUM
-from .log.quiet import QuietLogger
+from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .log.verbose import VerboseLogger
+from .log.quiet import QuietLogger
+from typing import Iterator
 
 TIMEOUT = 0.1
 MAX_RETRY_COUNT = 20
@@ -67,9 +67,9 @@ class RdpStream:
 
     def _recv_seg(self) -> Segment:
         """
-        Blocks the main thread until a new segment arrives through the socket. If
-        a SYNACK segment arrives will try and finish establishing the connection
-        with the other end.
+        Blocks the main thread until a new segment arrives through the socket.
+        If a SYNACK segment arrives will try and finish establishing the
+        connection with the other end.
         """
         seg_bytes = self._recv_from_peer()
         seg = Segment.from_bytes(seg_bytes)

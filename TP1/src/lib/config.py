@@ -95,7 +95,7 @@ class ClientConfig(Config):
 
             i += 1
 
-        if self._name == None:
+        if self._name is None:
             raise InvalidArgs("No file name was provided")
 
     def name(self) -> str:

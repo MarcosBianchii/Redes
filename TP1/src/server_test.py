@@ -1,7 +1,7 @@
+from lib.rdp.socket import RdpListener
 from threading import Thread
-import signal
 from sys import argv
-from rdp.socket import RdpListener
+import signal
 
 if len(argv) < 2 or ":" not in argv[1]:
     print(f"Use: python3 {argv[0]} <ip:port>")
