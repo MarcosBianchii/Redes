@@ -4,7 +4,7 @@ from enum import Enum
 """
                        UPLOAD                        DOWNLOAD
 
-                 UP /file_name\ndata             DOWN /file_name
+                 UP /file_name\ndata             DOWN /file_name\n
 
 
 
@@ -45,6 +45,9 @@ class Method(Enum):
             case Method.OK:
                 return "OK"
 
+    def encode(self) -> bytes:
+        return str(self).encode()
+
 
 class MessageBuilder:
     def __init__(self):
@@ -81,12 +84,7 @@ class Message:
     def from_bytes(cls, data: bytes) -> Message:
         method_len = data.index(b" ")
         method = data[:method_len].decode()
-
-        try:
-            nl = data.index(b"\n")
-        except ValueError:
-            nl = len(data)
-
+        nl = data.index(b"\n")
         path = data[method_len + 1:nl].decode()
         data = data[nl + 1:]
 
@@ -154,12 +152,7 @@ class Message:
         Turns the message into bytes
         """
         path = self._path.encode()
-        encoding = str(self._method).encode() + b" " + path
-
-        if self.is_upload() or self.is_ok() or self.is_error():
-            encoding += b"\n" + self._data
-
-        return encoding
+        return self._method.encode() + b" " + path + b"\n" + self._data
 
     def __str__(self) -> str:
         return f"{self._method} {self._path} {len(self._data)}"
