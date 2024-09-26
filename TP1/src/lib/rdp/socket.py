@@ -2,10 +2,12 @@ from __future__ import annotations
 from .segment import Segment, MAX_SEG_SIZE, RDP_HEADER_SIZE, MAX_SEQ_NUM
 from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .log.verbose import VerboseLogger
+from heapq import heappush, heappop
 from .log.quiet import QuietLogger
 from typing import Iterator
+from time import time
 
-TIMEOUT = 0.1
+TIMEOUT = 0.075
 MAX_RETRY_COUNT = 20
 
 
@@ -87,61 +89,91 @@ class RdpStream:
     def _advance_seq_ofs(self, quantity: int):
         self._seq_ofs = (self._seq_ofs + quantity) % MAX_SEQ_NUM
 
-    def recv(self) -> bytes:
+    def recv(self, winsize: int = 1) -> bytes:
         """
-        Blocks the main thread until a new segment arrives through the socket.
+        locks the main thread until a new segment arrives through the socket.
         """
         self.settimeout(None)
-        data = bytes()
+        already_received = set()
+        data = bytearray()
+        received = []
 
         while True:
             seg = self._recv_seg()
 
-            if not seg.is_ack() and seg.seq_num() <= self._seq_ofs:
+            if not seg.is_ack() and seg.seq_num() < self._seq_ofs + winsize:
                 ack_seg = Segment.ack_seg(seg.seq_num())
                 self._sendall(ack_seg)
 
-                if seg.seq_num() == self._seq_ofs:
+                if seg.seq_num() not in already_received:
+                    already_received.add(seg.seq_num())
+                    heappush(received, (seg.seq_num(), seg))
+
+                while received and received[0][0] == self._seq_ofs:
                     self._advance_seq_ofs(1)
-                    data += seg.unwrap()
+                    _, seg = heappop(received)
+
+                    data.extend(seg.unwrap())
                     if seg.is_lst():
-                        break
+                        return data
 
-        return data
-
-    def send(self, data: bytes):
+    def send(self, data: bytes, winsize: int = 1):
         """
         Sends the bytes in `data` through the socket.
         """
         self.settimeout(TIMEOUT)
-        retries = 0
+        segs_to_send = list(Segment.make_segments(data, self._seq_ofs))
+        winsize = min(winsize, len(segs_to_send))
+        send_time = [0] * len(segs_to_send)
+        retries = [-1] * len(segs_to_send)
+        max_retry = 0
 
-        for seg in Segment.make_segments(data, self._seq_ofs):
-            while not (seg.is_lst() and retries == MAX_RETRY_COUNT):
-                self._sendall(seg)
-                try:
-                    res = self._recv_seg()
-                except timeout:
-                    retries += 1
-                    continue
+        a = 0
+        b = winsize
+        ackd = set()
 
-                if res.is_ack() and res.seq_num() == seg.seq_num():
-                    self._advance_seq_ofs(1)
-                    retries = 0
-                    break
+        while max_retry < MAX_RETRY_COUNT:
+            now = time()
+            for i in range(a, b):
+                if now - send_time[i] >= TIMEOUT:
+                    self._sendall(segs_to_send[i])
+                    send_time[i] = now
+                    retries[i] += 1
+                    max_retry = max(max_retry, retries[i])
 
-                if not res.is_ack():
-                    if res.seq_num() < self._seq_ofs:
-                        # The other side is still sending a data
-                        # segment from a previous call to recv.
-                        ack_seg = Segment.ack_seg(res.seq_num())
-                        self._sendall(ack_seg)
-                    else:
-                        # We didn't receive their last ACK
-                        # and are still trying to send the
-                        # last segment.
-                        self._advance_seq_ofs(1)
-                        return
+            try:
+                res = self._recv_seg()
+            except timeout:
+                continue
+
+            if res.is_ack() and res.seq_num() < self._seq_ofs + winsize:
+                ackd.add(res.seq_num())
+
+                if res.seq_num() == self._seq_ofs:
+                    ackds = 0
+                    while self._seq_ofs in ackd:
+                        ackd.remove(self._seq_ofs)
+                        ackds += 1
+
+                    a += ackds
+                    self._advance_seq_ofs(ackds)
+                    b = min(b + ackds, len(segs_to_send))
+
+                    if segs_to_send[a - 1].is_lst():
+                        break
+
+            if not res.is_ack():
+                if res.seq_num() < self._seq_ofs:
+                    # The other side is still sending a data
+                    # segment from a previous call to recv.
+                    ack_seg = Segment.ack_seg(res.seq_num())
+                    self._sendall(ack_seg)
+                else:
+                    # We didn't receive their last ACK
+                    # and are still trying to send the
+                    # last segment.
+                    self._advance_seq_ofs(len(segs_to_send) - a)
+                    return
 
     def addr(self) -> tuple[str, int]:
         return self._addr

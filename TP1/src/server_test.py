@@ -1,5 +1,4 @@
 from lib.rdp.socket import RdpListener
-from threading import Thread
 from sys import argv
 import signal
 
@@ -9,15 +8,10 @@ if len(argv) < 2 or ":" not in argv[1]:
 
 ip, port = argv[1].split(":")
 listener = RdpListener.bind(ip, int(port), log=True)
-threads: list[Thread] = []
 
 
-# Handle SIGINT
 def close_listener(sig, frame):
     listener.close()
-    for thread in threads:
-        thread.join()
-
     exit(0)
 
 
@@ -25,6 +19,6 @@ signal.signal(signal.SIGINT, close_listener)
 
 
 for stream in listener:
-    thread = Thread(target=lambda stream: stream.recv(), args=(stream, ))
-    thread.start()
-    threads.append(thread)
+    data = stream.recv(winsize=10)
+    print(data.decode())
+    stream.close()
