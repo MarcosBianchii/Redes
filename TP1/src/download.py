@@ -14,8 +14,9 @@ if __name__ == "__main__":
 
     name = config.name()
     msg = Message.download(name)
-    stream.send(msg.encode())
-    res = stream.recv()
+    winsize = config.winsize()
+    stream.send(msg.encode(), winsize)
+    res = stream.recv(winsize)
     stream.close()
 
     msg = Message.from_bytes(res)
@@ -25,5 +26,5 @@ if __name__ == "__main__":
 
     dst = config.dst()
     os.makedirs(dst, exist_ok=True)
-    with open(dst + "/" + name, "wb") as f:
+    with open(dst + msg.path(), "wb") as f:
         f.write(msg.unwrap())

@@ -1,9 +1,5 @@
 class InvalidArgs(Exception):
-    def __init__(self, msg: str):
-        self._msg = msg
-
-    def __str__(self) -> str:
-        return self._msg
+    pass
 
 
 class Config:
@@ -11,6 +7,7 @@ class Config:
         self._verbose = False
         self._host = "127.0.0.1"
         self._port = 12000
+        self._winsize = 1
 
         i = 1
         while i < len(args):
@@ -28,16 +25,24 @@ class Config:
                 case "-H" | "--host":
                     try:
                         self._host = args[i + 1]
-                    except IndexError:
-                        raise InvalidArgs("No host was provided")
+                    except IndexError as e:
+                        raise InvalidArgs("No host was provided") from e
 
                 case "-p" | "--port":
                     try:
                         self._port = int(args[i + 1])
-                    except IndexError:
-                        raise InvalidArgs("No port was provided")
-                    except ValueError:
-                        raise InvalidArgs("The given port is not a number")
+                    except IndexError as e:
+                        raise InvalidArgs("No port was provided") from e
+                    except ValueError as e:
+                        raise InvalidArgs("The given port is not a number") from e
+
+                case "-w" | "--winsize":
+                    try:
+                        self._winsize = int(args[i + 1])
+                    except IndexError as e:
+                        raise InvalidArgs("No window size was provided") from e
+                    except ValueError as e:
+                        raise InvalidArgs("The given window size is not a number") from e
 
             i += 1
 
@@ -47,17 +52,21 @@ class Config:
     def verbose(self) -> bool:
         return self._verbose
 
+    def winsize(self) -> int:
+        return self._winsize
+
 
 SERVER_HELP: str = """
 usage : {} [-h] [-v | -q] [-H ADDR] [-p PORT] [-s DIRPATH]
 
 optional arguments:
-    -h , --help     show this help message and exit
-    -v , --verbose  increase output verbosity
-    -q , --quiet    decrease output verbosity
-    -H , --host     service IP address
-    -p , --port     service port
-    -s , --storage  storage dir path
+    -h, --help     show this help message and exit
+    -v, --verbose  increase output verbosity
+    -q, --quiet    decrease output verbosity
+    -H, --host     service IP address
+    -p, --port     service port
+    -w, --winsize  window size for pipeline streaming
+    -s, --storage  storage dir path
 """
 
 
@@ -71,8 +80,8 @@ class ServerConfig(Config):
             if args[i] == "-s" or args[i] == "--storage":
                 try:
                     self._storage = args[i + 1]
-                except IndexError:
-                    raise InvalidArgs("No storage directory was given")
+                except IndexError as e:
+                    raise InvalidArgs("No storage directory was given") from e
 
             i += 1
 
@@ -90,8 +99,8 @@ class ClientConfig(Config):
             if args[i] == "-n" or args[i] == "--name":
                 try:
                     self._name = args[i + 1]
-                except IndexError:
-                    raise InvalidArgs("No file name was provided")
+                except IndexError as e:
+                    raise InvalidArgs("No file name was provided") from e
 
             i += 1
 
@@ -111,6 +120,7 @@ optional arguments:
     -q, --quiet    decrease output verbosity
     -H, --host     server IP address
     -p, --port     server port
+    -w, --winsize  window size for pipeline streaming
     -s, --src      source file path
     -n, --name     file name
 """
@@ -126,8 +136,8 @@ class UploadConfig(ClientConfig):
             if args[i] == "-s" or args[i] == "--src":
                 try:
                     self._src = args[i + 1]
-                except IndexError:
-                    raise InvalidArgs("No src directory was provided")
+                except IndexError as e:
+                    raise InvalidArgs("No src directory was provided") from e
 
             i += 1
 
@@ -144,6 +154,7 @@ optional arguments:
     -q, --quiet    decrease output verbosity
     -H, --host     server IP address
     -p, --port     server port
+    -w, --winsize  window size for pipeline streaming
     -d, --dst      destination file path
     -n, --name     file name
 """
@@ -159,8 +170,8 @@ class DownloadConfig(ClientConfig):
             if args[i] == "-d" or args[i] == "--dst":
                 try:
                     self._dst = args[i + 1]
-                except IndexError:
-                    raise InvalidArgs("No destination file path was given")
+                except IndexError as e:
+                    raise InvalidArgs("No destination file path was given") from e
 
             i += 1
 

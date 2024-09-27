@@ -90,7 +90,7 @@ class RdpStream:
 
     def recv(self, winsize: int = 1) -> bytes:
         """
-        locks the main thread until a new segment arrives through the socket.
+        Blocks the main thread until a new segment arrives through the socket.
         """
         self.settimeout(None)
         data = bytearray()

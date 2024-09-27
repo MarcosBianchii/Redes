@@ -16,8 +16,9 @@ if __name__ == "__main__":
     stream = RdpStream.connect(ip, port, log=log)
 
     msg = Message.upload(name, data)
-    stream.send(msg.encode())
-    res = stream.recv()
+    winsize = config.winsize()
+    stream.send(msg.encode(), winsize)
+    res = stream.recv(winsize)
     stream.close()
 
     msg = Message.from_bytes(res)
