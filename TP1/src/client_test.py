@@ -8,8 +8,8 @@ if len(argv) < 2 or ":" not in argv[1]:
 ip, port = argv[1].split(":")
 stream = RdpStream.connect(ip, int(port), log=True)
 
-with open("lorem_ipsum.txt") as f:
-    data = f.read()
-    stream.send(data.encode(), winsize=10)
+with open("lorem_ipsum.txt", "r") as f:
+    text = f.read()
+    stream.send(text.encode(), winsize=10)
 
 stream.close()

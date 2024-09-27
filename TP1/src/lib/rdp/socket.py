@@ -2,12 +2,11 @@ from __future__ import annotations
 from .segment import Segment, MAX_SEG_SIZE, RDP_HEADER_SIZE, MAX_SEQ_NUM
 from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .log.verbose import VerboseLogger
-from heapq import heappush, heappop
 from .log.quiet import QuietLogger
 from typing import Iterator
 from time import time
 
-TIMEOUT = 0.075
+TIMEOUT = 0.09
 MAX_RETRY_COUNT = 20
 
 
@@ -94,9 +93,8 @@ class RdpStream:
         locks the main thread until a new segment arrives through the socket.
         """
         self.settimeout(None)
-        already_received = set()
         data = bytearray()
-        received = []
+        received = {}
 
         while True:
             seg = self._recv_seg()
@@ -105,14 +103,10 @@ class RdpStream:
                 ack_seg = Segment.ack_seg(seg.seq_num())
                 self._sendall(ack_seg)
 
-                if seg.seq_num() not in already_received:
-                    already_received.add(seg.seq_num())
-                    heappush(received, (seg.seq_num(), seg))
-
-                while received and received[0][0] == self._seq_ofs:
+                received[seg.seq_num()] = seg
+                while self._seq_ofs in received:
+                    seg = received.pop(self._seq_ofs)
                     self._advance_seq_ofs(1)
-                    _, seg = heappop(received)
-
                     data.extend(seg.unwrap())
                     if seg.is_lst():
                         return data
@@ -135,11 +129,13 @@ class RdpStream:
         while max_retry < MAX_RETRY_COUNT:
             now = time()
             for i in range(a, b):
-                if now - send_time[i] >= TIMEOUT:
-                    self._sendall(segs_to_send[i])
-                    send_time[i] = now
-                    retries[i] += 1
-                    max_retry = max(max_retry, retries[i])
+                seg = segs_to_send[i]
+                if seg.seq_num() not in ackd:
+                    if now - send_time[i] >= TIMEOUT:
+                        self._sendall(seg)
+                        send_time[i] = now
+                        retries[i] += 1
+                        max_retry = max(max_retry, retries[i])
 
             try:
                 res = self._recv_seg()
@@ -150,19 +146,16 @@ class RdpStream:
                 ackd.add(res.seq_num())
 
                 if res.seq_num() == self._seq_ofs:
-                    ackds = 0
                     while self._seq_ofs in ackd:
                         ackd.remove(self._seq_ofs)
-                        ackds += 1
-
-                    a += ackds
-                    self._advance_seq_ofs(ackds)
-                    b = min(b + ackds, len(segs_to_send))
+                        self._advance_seq_ofs(1)
+                        a += 1
+                        b = min(b + 1, len(segs_to_send))
 
                     if segs_to_send[a - 1].is_lst():
-                        break
+                        return
 
-            if not res.is_ack():
+            elif not res.is_ack():
                 if res.seq_num() < self._seq_ofs:
                     # The other side is still sending a data
                     # segment from a previous call to recv.

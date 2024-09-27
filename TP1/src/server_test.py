@@ -21,4 +21,5 @@ signal.signal(signal.SIGINT, close_listener)
 for stream in listener:
     data = stream.recv(winsize=10)
     print(data.decode())
+
     stream.close()

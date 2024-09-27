@@ -20,7 +20,7 @@ class PacketLoss(Topo):
         s1 = self.addSwitch('s1')
 
         # Add links
-        self.addLink(h1, s1, cls=TCLink, loss=10)
+        self.addLink(h1, s1, cls=TCLink, loss=20)
         self.addLink(h2, s1, cls=TCLink, loss=0)
 
 
