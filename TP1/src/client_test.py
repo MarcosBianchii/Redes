@@ -10,6 +10,6 @@ stream = RdpStream.connect(ip, int(port), log=True)
 
 with open("lorem_ipsum.txt", "r") as f:
     text = f.read()
-    stream.send(text.encode(), winsize=10)
+    stream.send(text.encode(), winsize=20)
 
 stream.close()

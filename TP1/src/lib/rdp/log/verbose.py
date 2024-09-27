@@ -14,7 +14,9 @@ class VerboseLogger(Logger):
             kind += "SYN"
         if seg.is_ack():
             kind += "ACK"
-        if not seg.is_ack() and not seg.is_syn():
+        elif seg.is_fin():
+            kind += "FIN"
+        else:
             kind += "SEG"
 
         return kind

@@ -2,12 +2,12 @@ from __future__ import annotations
 from .segment import Segment, MAX_SEG_SIZE, RDP_HEADER_SIZE, MAX_SEQ_NUM
 from socket import socket, AF_INET, SOCK_DGRAM, timeout
 from .log.verbose import VerboseLogger
+from typing import Iterator, Optional
 from .log.quiet import QuietLogger
-from typing import Iterator
 from time import time
 
-TIMEOUT = 0.09
-MAX_RETRY_COUNT = 20
+TIMEOUT = 0.08
+MAX_TIMEOUT_COUNT = 20
 
 
 class RdpStream:
@@ -115,29 +115,26 @@ class RdpStream:
         """
         Sends the bytes in `data` through the socket.
         """
-        self.settimeout(TIMEOUT)
         segs_to_send = list(Segment.make_segments(data, self._seq_ofs))
         winsize = min(winsize, len(segs_to_send))
         send_time = [0] * len(segs_to_send)
-        retries = [-1] * len(segs_to_send)
-        max_retry = 0
 
         a = 0
         b = winsize
         ackd = set()
 
-        while max_retry < MAX_RETRY_COUNT:
-            now = time()
+        while True:
+            self.settimeout(None)
             for i in range(a, b):
                 seg = segs_to_send[i]
                 if seg.seq_num() not in ackd:
+                    now = time()
                     if now - send_time[i] >= TIMEOUT:
                         self._sendall(seg)
                         send_time[i] = now
-                        retries[i] += 1
-                        max_retry = max(max_retry, retries[i])
 
             try:
+                self.settimeout(TIMEOUT)
                 res = self._recv_seg()
             except timeout:
                 continue
@@ -174,10 +171,33 @@ class RdpStream:
     def peer_addr(self) -> tuple[str, int]:
         return self._peer_addr
 
-    def settimeout(self, timeout: float):
+    def settimeout(self, timeout: Optional[float]):
         self._skt.settimeout(timeout)
 
     def close(self):
+        fin_seg = Segment.fin_seg(self._seq_ofs)
+        timeouts = 0
+
+        while timeouts < MAX_TIMEOUT_COUNT:
+            self.settimeout(None)
+            self._sendall(fin_seg)
+
+            try:
+                self.settimeout(TIMEOUT)
+                res = self._recv_seg()
+                timeouts = 0
+            except timeout:
+                timeouts += 1
+                continue
+
+            if res.is_fin():
+                ack_seg = Segment.ack_seg(self._seq_ofs)
+                self._sendall(ack_seg)
+                break
+
+            if res.is_ack() and res.seq_num() == fin_seg.seq_num():
+                break
+
         self._skt.close()
 
 
@@ -186,6 +206,7 @@ class RdpListener:
         self._log = VerboseLogger() if log else QuietLogger()
         self._skt = socket(AF_INET, SOCK_DGRAM)
         self._skt.bind(addr)
+        self._logging = log
         self._conns = set()
         self._addr = addr
 
@@ -214,7 +235,7 @@ class RdpListener:
                 break
 
         # Send SYNACK to peer from a new socket
-        stream = RdpStream(peer_addr, isinstance(self._log, VerboseLogger))
+        stream = RdpStream(peer_addr, log=self._logging)
         syn_ack_seg = Segment.syn_ack_seg()
         stream.settimeout(TIMEOUT)
 

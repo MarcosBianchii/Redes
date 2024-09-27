@@ -9,6 +9,7 @@ MAX_SEQ_NUM = 2 ** 24
 ACK_MASK = 1 << 7
 SYN_MASK = 1 << 6
 LST_MASK = 1 << 5
+FIN_MASK = 1 << 4
 
 """
                            RDP HEADER
@@ -16,9 +17,9 @@ LST_MASK = 1 << 5
                      1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|A|S|L|         |                                               |
-|C|Y|S|  FLAGS  |                    SEQ NUM                    |
-|K|N|T|         |                                               |
+|A|S|L|F|       |                                               |
+|C|Y|S|I| FLAGS |                    SEQ NUM                    |
+|K|N|T|N|       |                                               |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                                                               |
 .                             DATA                              .
@@ -32,6 +33,7 @@ class SegmentBuilder:
         self._ack = False
         self._syn = False
         self._lst = False
+        self._fin = False
         self._seq_num = 0
         self._data = bytes()
 
@@ -47,6 +49,10 @@ class SegmentBuilder:
         self._lst = value
         return self
 
+    def fin(self, value: bool) -> SegmentBuilder:
+        self._fin = value
+        return self
+
     def seq_num(self, value: int) -> SegmentBuilder:
         self._seq_num = value
         return self
@@ -56,14 +62,15 @@ class SegmentBuilder:
         return self
 
     def build(self) -> Segment:
-        return Segment(self._ack, self._syn, self._lst, self._seq_num, self._data)
+        return Segment(self._ack, self._syn, self._lst, self._fin, self._seq_num, self._data)
 
 
 class Segment:
-    def __init__(self, ack: bool, syn: bool, lst: bool, seq_num: int, data: bytes):
+    def __init__(self, ack: bool, syn: bool, lst: bool, fin: bool, seq_num: int, data: bytes):
         self._ack = ack
         self._syn = syn
         self._lst = lst
+        self._fin = fin
         self._seq_num = seq_num
         self._data = data
 
@@ -73,12 +80,14 @@ class Segment:
         ack = flags & ACK_MASK != 0
         syn = flags & SYN_MASK != 0
         lst = flags & LST_MASK != 0
+        fin = flags & FIN_MASK != 0
         seq_num = int.from_bytes(seg_bytes[1:4], "big")
         data = seg_bytes[RDP_HEADER_SIZE:]
         return cls.builder()  \
             .ack(ack)         \
             .syn(syn)         \
             .lst(lst)         \
+            .fin(fin)         \
             .seq_num(seq_num) \
             .data(data)       \
             .build()
@@ -107,6 +116,13 @@ class Segment:
             .syn(True)        \
             .build()
 
+    @classmethod
+    def fin_seg(cls, seq_num: int) -> Segment:
+        return cls.builder()  \
+            .fin(True)        \
+            .seq_num(seq_num) \
+            .build()
+
     def is_syn(self) -> bool:
         return self._syn
 
@@ -115,6 +131,9 @@ class Segment:
 
     def is_lst(self) -> bool:
         return self._lst
+
+    def is_fin(self) -> bool:
+        return self._fin
 
     def seq_num(self) -> int:
         return self._seq_num
@@ -148,7 +167,8 @@ class Segment:
         ack = ACK_MASK * self.is_ack()
         syn = SYN_MASK * self.is_syn()
         lst = LST_MASK * self.is_lst()
-        flags = int.to_bytes(ack | syn | lst, 1, "big")
+        fin = FIN_MASK * self.is_fin()
+        flags = int.to_bytes(ack | syn | lst | fin, 1, "big")
         data.extend(flags)
 
         seq_num = self.seq_num().to_bytes(3, "big")
@@ -158,4 +178,4 @@ class Segment:
         return data
 
     def __str__(self) -> str:
-        return f"ack: {self._ack}, syn: {self._syn}, lst: {self._lst}, seq_num: {self._seq_num}, dsize: {len(self._data)}"
+        return f"ack: {self._ack}, syn: {self._syn}, lst: {self._lst}, fin: {self._fin}, seq_num: {self._seq_num}, dsize: {len(self._data)}"
