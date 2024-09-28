@@ -116,16 +116,25 @@ class RdpStream:
                 raise Hangup("The other end closed the connection")
 
             if not seg.is_ack() and seg.seq_num() < self._seq_ofs + winsize:
-                ack_seg = Segment.ack_seg(seg.seq_num())
-                self._sendall(ack_seg)
+                if seg.seq_num() > self._seq_ofs:
+                    sac_seg = Segment.sac_seg(seg.seq_num())
+                    self._sendall(sac_seg)
+                    received[seg.seq_num()] = seg
+                    continue
 
                 received[seg.seq_num()] = seg
                 while self._seq_ofs in received:
                     seg = received.pop(self._seq_ofs)
                     self._advance_seq_ofs(1)
                     data.extend(seg.unwrap())
+
                     if seg.is_lst():
+                        ack_seg = Segment.ack_seg(seg.seq_num())
+                        self._sendall(ack_seg)
                         return data
+
+                ack_seg = Segment.ack_seg(self._seq_ofs - 1)
+                self._sendall(ack_seg)
 
     def send(self, data: bytes, winsize: int = 1):
         """
@@ -156,24 +165,24 @@ class RdpStream:
             except timeout:
                 continue
 
-            if res.is_ack() and res.seq_num() < self._seq_ofs + winsize:
+            if res.is_sac() and res.seq_num() < self._seq_ofs + winsize:
                 ackd.add(res.seq_num())
 
-                if res.seq_num() == self._seq_ofs:
-                    while self._seq_ofs in ackd:
-                        ackd.remove(self._seq_ofs)
-                        self._advance_seq_ofs(1)
-                        a += 1
-                        b = min(b + 1, len(segs_to_send))
+            elif res.is_ack() and res.seq_num() < self._seq_ofs + winsize:
+                for seq_num in range(self._seq_ofs, res.seq_num() + 1):
+                    ackd.add(seq_num)
+                    self._advance_seq_ofs(1)
+                    a += 1
+                    b = min(b + 1, len(segs_to_send))
 
-                    if segs_to_send[a - 1].is_lst():
-                        return
+                if segs_to_send[a - 1].is_lst():
+                    return
 
-            elif not res.is_ack():
+            elif not res.is_ack() and not res.is_sac():
                 if res.seq_num() < self._seq_ofs:
                     # The other side is still sending a data
                     # segment from a previous call to recv.
-                    ack_seg = Segment.ack_seg(res.seq_num())
+                    ack_seg = Segment.ack_seg(self._seq_ofs - 1)
                     self._sendall(ack_seg)
                 else:
                     # We didn't receive their last ACK

@@ -13,6 +13,3 @@ class QuietLogger(Logger):
 
     def send(self, seg):
         pass
-
-    def timeout(self, msg: str):
-        pass

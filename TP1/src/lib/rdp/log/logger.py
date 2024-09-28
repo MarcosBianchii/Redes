@@ -17,7 +17,3 @@ class Logger:
     @abstractmethod
     def send(self, seg):
         pass
-
-    @abstractmethod
-    def timeout(self, msg: str):
-        pass

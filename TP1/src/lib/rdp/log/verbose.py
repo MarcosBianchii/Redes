@@ -16,6 +16,8 @@ class VerboseLogger(Logger):
             kind += "ACK"
         elif seg.is_fin():
             kind += "FIN"
+        elif seg.is_sac():
+            kind += "SAC"
         elif not seg.is_syn() and not seg.is_ack():
             kind += "SEG"
 
@@ -28,6 +30,3 @@ class VerboseLogger(Logger):
     def send(self, seg):
         kind = self._seg_kind(seg)
         print(f"[SEND] {kind}({seg.seq_num()})")
-
-    def timeout(self, msg: str):
-        print(f"[TOUT] {msg}")
