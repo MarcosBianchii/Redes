@@ -116,13 +116,12 @@ class RdpStream:
                 raise Hangup("The other end closed the connection")
 
             if not seg.is_ack() and seg.seq_num() < self._seq_ofs + winsize:
+                received[seg.seq_num()] = seg
                 if seg.seq_num() > self._seq_ofs:
                     sac_seg = Segment.sac_seg(seg.seq_num())
                     self._sendall(sac_seg)
-                    received[seg.seq_num()] = seg
                     continue
 
-                received[seg.seq_num()] = seg
                 while self._seq_ofs in received:
                     seg = received.pop(self._seq_ofs)
                     self._advance_seq_ofs(1)
@@ -170,7 +169,7 @@ class RdpStream:
 
             elif res.is_ack() and res.seq_num() < self._seq_ofs + winsize:
                 for seq_num in range(self._seq_ofs, res.seq_num() + 1):
-                    ackd.add(seq_num)
+                    ackd.discard(seq_num)
                     self._advance_seq_ofs(1)
                     a += 1
                     b = min(b + 1, len(segs_to_send))
