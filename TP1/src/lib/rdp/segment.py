@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Iterator
 
-MAX_SEG_SIZE = 4096
+MAX_SEG_SIZE = 1028
 RDP_HEADER_SIZE = 4
 RDP_DATA_SIZE = MAX_SEG_SIZE - RDP_HEADER_SIZE
 MAX_SEQ_NUM = 2 ** 24

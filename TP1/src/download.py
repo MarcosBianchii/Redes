@@ -8,17 +8,21 @@ import os
 if __name__ == "__main__":
     config = DownloadConfig(argv)
 
-    log = config.verbose()
-    ip, port = config.addr()
-    stream = RdpStream.connect(ip, port, log=log)
-
     name = config.name()
     msg = Message.download(name)
     winsize = config.winsize()
-    stream.send(msg.encode(), winsize)
-    res = stream.recv(winsize)
-    stream.close()
 
+    log = config.verbose()
+    ip, port = config.addr()
+    stream = RdpStream.connect(ip, port, log=log)
+    try:
+        stream.send(msg.encode(), winsize)
+        res = stream.recv(winsize)
+    except KeyboardInterrupt:
+        stream.close()
+        exit(0)
+
+    stream.close()
     msg = Message.from_bytes(res)
     if msg.is_error():
         print(msg.unwrap().decode())

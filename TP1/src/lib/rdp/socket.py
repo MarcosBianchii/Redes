@@ -10,12 +10,17 @@ TIMEOUT = 0.08
 MAX_TIMEOUT_COUNT = 20
 
 
+class Hangup(Exception):
+    pass
+
+
 class RdpStream:
     def __init__(self, peer_addr: tuple[str, int], log: bool):
         self._log = VerboseLogger() if log else QuietLogger()
         self._skt = socket(AF_INET, SOCK_DGRAM)
         self._addr = self._skt.getsockname()
         self._peer_addr = peer_addr
+        self._closed = False
         self._seq_ofs = 0
 
     @classmethod
@@ -46,6 +51,10 @@ class RdpStream:
         self._sendall(ack_seg)
         self._log.connection_established(peer_addr)
         return self
+
+    def _validate_open(self):
+        if self._closed:
+            raise Hangup("The socket has already been closed")
 
     def _sendall(self, seg: Segment):
         """
@@ -88,16 +97,23 @@ class RdpStream:
     def _advance_seq_ofs(self, quantity: int):
         self._seq_ofs = (self._seq_ofs + quantity) % MAX_SEQ_NUM
 
+    def _settimeout(self, timeout: Optional[float]):
+        self._skt.settimeout(timeout)
+
     def recv(self, winsize: int = 1) -> bytes:
         """
         Blocks the main thread until a new segment arrives through the socket.
         """
-        self.settimeout(None)
+        self._validate_open()
+        self._settimeout(None)
         data = bytearray()
         received = {}
 
         while True:
             seg = self._recv_seg()
+
+            if seg.is_fin():
+                raise Hangup("The other end closed the connection")
 
             if not seg.is_ack() and seg.seq_num() < self._seq_ofs + winsize:
                 ack_seg = Segment.ack_seg(seg.seq_num())
@@ -115,6 +131,7 @@ class RdpStream:
         """
         Sends the bytes in `data` through the socket.
         """
+        self._validate_open()
         segs_to_send = list(Segment.make_segments(data, self._seq_ofs))
         winsize = min(winsize, len(segs_to_send))
         send_time = [0] * len(segs_to_send)
@@ -124,7 +141,7 @@ class RdpStream:
         ackd = set()
 
         while True:
-            self.settimeout(None)
+            self._settimeout(None)
             for i in range(a, b):
                 seg = segs_to_send[i]
                 if seg.seq_num() not in ackd:
@@ -134,7 +151,7 @@ class RdpStream:
                         send_time[i] = now
 
             try:
-                self.settimeout(TIMEOUT)
+                self._settimeout(TIMEOUT)
                 res = self._recv_seg()
             except timeout:
                 continue
@@ -166,24 +183,26 @@ class RdpStream:
                     return
 
     def addr(self) -> tuple[str, int]:
+        self._validate_open()
         return self._addr
 
     def peer_addr(self) -> tuple[str, int]:
+        self._validate_open()
         return self._peer_addr
 
-    def settimeout(self, timeout: Optional[float]):
-        self._skt.settimeout(timeout)
-
     def close(self):
+        if self._closed:
+            return
+
         fin_seg = Segment.fin_seg(self._seq_ofs)
         timeouts = 0
 
         while timeouts < MAX_TIMEOUT_COUNT:
-            self.settimeout(None)
+            self._settimeout(None)
             self._sendall(fin_seg)
 
             try:
-                self.settimeout(TIMEOUT)
+                self._settimeout(TIMEOUT)
                 res = self._recv_seg()
                 timeouts = 0
             except timeout:
@@ -191,13 +210,14 @@ class RdpStream:
                 continue
 
             if res.is_fin():
-                ack_seg = Segment.ack_seg(self._seq_ofs)
+                ack_seg = Segment.ack_seg(res.seq_num())
                 self._sendall(ack_seg)
                 break
 
             if res.is_ack() and res.seq_num() == fin_seg.seq_num():
                 break
 
+        self._closed = True
         self._skt.close()
 
 
@@ -237,12 +257,13 @@ class RdpListener:
         # Send SYNACK to peer from a new socket
         stream = RdpStream(peer_addr, log=self._logging)
         syn_ack_seg = Segment.syn_ack_seg()
-        stream.settimeout(TIMEOUT)
 
         while True:
+            stream._settimeout(None)
             stream._sendall(syn_ack_seg)
             try:
                 # Wait to receive ACK of SYNACK
+                stream._settimeout(TIMEOUT)
                 seg_bytes = stream._recv_from_peer()
             except timeout:
                 continue
