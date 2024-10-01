@@ -7,4 +7,4 @@ fi
 host_id="${1:1}"
 winsize="$2"
 
-python3 download.py -v -H 10.0.0.1 -n -d downloads 5MB"$host_id".txt -w "$winsize"
+python3 download.py -v -H 10.0.0.1 -n -d downloads -n 5MB"$host_id".bin -w "$winsize"
