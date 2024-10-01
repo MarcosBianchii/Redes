@@ -14,11 +14,11 @@ class PacketLoss(Topo):
 
         s1 = self.addSwitch('s1')
 
-        self.addLink(h1, s1, cls=TCLink, loss=0)
-        self.addLink(h2, s1, cls=TCLink, loss=10)
-        self.addLink(h3, s1, cls=TCLink, loss=10)
-        self.addLink(h4, s1, cls=TCLink, loss=10)
-        self.addLink(h5, s1, cls=TCLink, loss=10)
+        self.addLink(h1, s1, cls=TCLink, loss=10)
+        self.addLink(h2, s1, cls=TCLink, loss=0)
+        self.addLink(h3, s1, cls=TCLink, loss=0)
+        self.addLink(h4, s1, cls=TCLink, loss=0)
+        self.addLink(h5, s1, cls=TCLink, loss=0)
 
 
 topos = {'packet-loss': (lambda: PacketLoss())}
