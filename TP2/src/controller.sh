@@ -1,0 +1,1 @@
+pox/pox.py log.level --DEBUG forwarding.l2_learning controller
