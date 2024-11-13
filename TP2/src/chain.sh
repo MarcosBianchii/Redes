@@ -1,1 +1,1 @@
-sudo mn --custom mininet.py --topo=chain --mac --arp --switch ovsk --controller remote
+sudo mn --custom mininet.py --topo=chain,$1 --mac --arp --switch ovsk --controller remote
