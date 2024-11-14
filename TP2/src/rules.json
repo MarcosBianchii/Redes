@@ -1,0 +1,28 @@
+[
+    {
+        "switches": [2],
+        "tp_proto": "tcp",
+        "tp_dst": 80
+    },
+    {
+        "switches": [2],
+        "tp_proto": "udp",
+        "tp_dst": 80
+    },
+    {
+        "switches": [2],
+        "tp_proto": "udp",
+        "tp_dst": 5001,
+        "dl_src": "00:00:00:00:00:01"
+    },
+    {
+        "switches": [2],
+        "dl_src": "00:00:00:00:00:01",
+        "dl_dst": "00:00:00:00:00:03"
+    },
+    {
+        "switches": [2],
+        "dl_src": "00:00:00:00:00:03",
+        "dl_dst": "00:00:00:00:00:01"
+    }
+]
