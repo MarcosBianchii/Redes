@@ -24,7 +24,7 @@ class Firewall(EventMixin):
             if sw_id in rule["switches"]:
                 self.install_rule(event, rule)
 
-        log.debug(f"Firewall rules installed on {dpidToStr(event.dpid)}")
+        log.debug(f"Firewall rules installed on {dpidToStr(sw_id)}")
 
     def install_rule(self, event, rule):
         matching = of.ofp_match()
